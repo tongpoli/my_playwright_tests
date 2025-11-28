@@ -14,10 +14,10 @@ pipeline {
 
         stage('Setup Python') {
             steps {
-                bat 'python -m venv venv'
-                bat "${VENV}\\Scripts\\pip install --upgrade pip"
-                bat "${VENV}\\Scripts\\pip install -r requirements.txt"
-                bat "${VENV}\\Scripts\\python -m playwright install"
+				bat 'python -m venv venv'
+				bat 'venv\\Scripts\\python.exe -m pip install --upgrade pip'
+				bat 'venv\\Scripts\\python.exe -m pip install -r requirements.txt'
+				bat 'venv\\Scripts\\python.exe -m playwright install'
             }
         }
 

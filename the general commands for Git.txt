@@ -1,0 +1,67 @@
+Pull: only if remote has new changes.
+
+Add → commit → push: normal workflow.
+
+Pull after push: generally not needed.
+
+git pull origin main
+
+git add .  ---stage all files in the folder
+git add file1 file2 file3 ... ---means stage specific files individually
+git commit -m "Add 10 new test scripts"   ---commit the changes
+git push origin main   ---push to the remote repo
+
+
+git status  ---check what’s staged before committing
+git log  ---oneline
+or s shortcut to stage,commit,and push all in one line
+
+git add . && git commit -m "adding new contents to 'the general commands for Git'" && git push origin main
+
+
+Branching & Merging
+
+git branch                 # List local branches
+git branch -r              # List remote branches
+git branch <branch-name>   # Create a new branch
+git checkout <branch>      # Switch to a branch
+git checkout -b <branch>   # Create and switch to a new branch
+git merge <branch>         # Merge another branch into current branch
+git rebase <branch>        # Rebase current branch onto another branch
+
+Inspecting Changes
+
+git diff                   # Show unstaged changes
+git diff --staged          # Show staged changes
+git log --oneline --graph  # View commits as a graph
+git show <commit-hash>     # Show details of a specific commit
+
+Undo & Reset
+
+git restore <file>         # Undo changes in a file (unstaged)
+git restore --staged <file># Unstage a file
+git reset --soft <commit>  # Move HEAD but keep staged changes
+git reset --hard <commit>  # Reset branch and discard all changes
+git revert <commit>        # Create a new commit that undoes a previous commit
+
+Remote Repositories
+
+git remote -v              # Show remote repositories
+git fetch origin           # Fetch latest changes from remote (no merge)
+git pull origin main       # Fetch + merge changes
+git push origin <branch>   # Push specific branch
+git push --set-upstream origin <branch>  # Push new branch and set tracking
+
+Stashing
+
+git stash                  # Save current changes temporarily
+git stash pop              # Reapply stashed changes
+git stash list             # List all stashes
+
+Tagging & Releases
+
+git tag <tagname>          # Create a tag at the current commit
+git tag -a <tagname> -m "message" # Annotated tag
+git push origin <tagname>  # Push tag to remote
+
+adding a new line for testing purpose
