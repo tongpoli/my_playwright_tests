@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        VENV = "${WORKSPACE}/venv"
+        VENV = "${WORKSPACE}\\venv"
     }
 
     stages {
@@ -14,16 +14,16 @@ pipeline {
 
         stage('Setup Python') {
             steps {
-                sh 'python -m venv venv'
-                sh "${VENV}/Scripts/pip install --upgrade pip"
-                sh "${VENV}/Scripts/pip install -r requirements.txt"
-                sh "${VENV}/Scripts/python -m playwright install"
+                bat 'python -m venv venv'
+                bat "${VENV}\\Scripts\\pip install --upgrade pip"
+                bat "${VENV}\\Scripts\\pip install -r requirements.txt"
+                bat "${VENV}\\Scripts\\python -m playwright install"
             }
         }
 
         stage('Run Tests') {
             steps {
-                sh "${VENV}/Scripts/pytest tests/ --html=playwright-report.html --self-contained-html"
+                bat "${VENV}\\Scripts\\pytest tests\\ --html=playwright-report.html --self-contained-html"
             }
         }
 
