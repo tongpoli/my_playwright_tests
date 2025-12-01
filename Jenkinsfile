@@ -74,15 +74,20 @@ pipeline {
 			steps {
 				script {
 					bat """
-		powershell -NoProfile -Command ^
-			"\$folders = Get-ChildItem 'C:\\Users\\tongp\\my_playwright_tests_report' -Directory | Sort-Object LastWriteTime -Descending; ^
-			if (\$folders.Count -gt 10) { ^
-				\$folders[10..(\$folders.Count-1)] | ForEach-Object { Remove-Item -Recurse -Force \$_.FullName }; ^
-			}"
-		"""
+		powershell -NoProfile -Command "& {
+			\$path = 'C:\\Users\\tongp\\my_playwright_tests_report';
+			\$folders = Get-ChildItem -Path \$path -Directory | Sort-Object LastWriteTime -Descending;
+			if (\$folders.Count -gt 10) {
+				\$folders[10..(\$folders.Count-1)] | ForEach-Object {
+					Remove-Item -Recurse -Force \$_.FullName
+				}
+			}
+		}"
+					"""
 				}
 			}
 		}
+
 
 
         stage('Compile Python App (PyInstaller)') {
