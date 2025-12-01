@@ -2,115 +2,129 @@ pipeline {
     agent any
 
     environment {
-        VENV = "${WORKSPACE}\\venv"
-        PYTHON = "${VENV}\\Scripts\\python.exe"
-        PIP = "${VENV}\\Scripts\\pip.exe"
+        // Virtual environment
+        VENV        = "${WORKSPACE}\\venv"
+        PYTHON      = "${VENV}\\Scripts\\python.exe"
+        PIP         = "${VENV}\\Scripts\\pip.exe"
 
-        // Deployment base folder
+        // Deployment locations
         DEPLOY_BASE = "C:\\Users\\tongp\\my_playwright_tests_report"
-
-        // Final deployment folder for compiled files
-        DEPLOY_BIN = "C:\\Users\\tongp\\my_playwright_tests_report\\deployment"
+        DEPLOY_BIN  = "${DEPLOY_BASE}\\deployment"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/tongpoli/my_playwright_tests.git'
+                git branch: 'main', 
+                    url: 'https://github.com/tongpoli/my_playwright_tests.git'
             }
         }
 
-        stage('Setup Python') {
+        stage('Setup Python Environment') {
             steps {
                 bat 'python -m venv venv'
                 bat '"%PIP%" install --upgrade pip'
                 bat '"%PIP%" install -r requirements.txt'
-                bat '"%PYTHON%" -m playwright install'
+                bat '"%PYTHON%" -m playwright install --with-deps --force'
             }
         }
 
-        stage('Run Tests') {
+        stage('Run Playwright Tests') {
             steps {
-                bat '"%PYTHON%" -m pytest tests --html=playwright-report.html --self-contained-html --disable-warnings'
+                bat """
+                    "%PYTHON%" -m pytest tests ^
+                      --html=playwright-report.html ^
+                      --self-contained-html ^
+                      --disable-warnings
+                """
             }
         }
 
-        stage('Publish Report to Jenkins') {
+        stage('Publish HTML Report') {
             steps {
                 publishHTML(target: [
                     allowMissing: false,
                     alwaysLinkToLastBuild: true,
                     keepAll: true,
-                    reportDir: '.',
+                    reportDir: '',
                     reportFiles: 'playwright-report.html',
                     reportName: 'Playwright Test Report'
                 ])
             }
         }
 
-        /* ---------------------------
-           🔽 CONTINUOUS DEPLOYMENT (CD)
-           --------------------------- */
-
-        stage('Deploy Report + Artifacts') {
+        stage('Deploy Report & Artifacts') {
             steps {
                 script {
-                    // Create timestamp for versioning
                     def ts = new Date().format("yyyyMMdd_HHmmss")
-                    env.DEPLOY_DIR = "${DEPLOY_BASE}\\deploy_${ts}"
+                    env.DEPLOY_DIR = "${DEPLOY_BASE}\\Report_${ts}"
 
-                    echo "Creating deployment folder: ${env.DEPLOY_DIR}"
                     bat "mkdir \"${env.DEPLOY_DIR}\""
+                    bat "copy /Y playwright-report.html \"${env.DEPLOY_DIR}\\\""
 
-                    // Copy HTML report, screenshots & logs if exist
-                    bat "copy /Y \"playwright-report.html\" \"${env.DEPLOY_DIR}\""
-                    bat "if exist \"screenshots\" xcopy screenshots \"${env.DEPLOY_DIR}\\screenshots\" /E /I /Y"
-                    bat "if exist \"logs\" xcopy logs \"${env.DEPLOY_DIR}\\logs\" /E /I /Y"
+                    // Copy screenshots, trace, videos, etc. if they exist
+                    bat 'if exist screenshots   xcopy screenshots   "%DEPLOY_DIR%\\screenshots"   /E /I /Y || exit 0'
+                    bat 'if exist test-results  xcopy test-results  "%DEPLOY_DIR%\\test-results"  /E /I /Y || exit 0'
+                    bat 'if exist trace         xcopy trace         "%DEPLOY_DIR%\\trace"         /E /I /Y || exit 0'
+                    bat 'if exist videos        xcopy videos        "%DEPLOY_DIR%\\videos"        /E /I /Y || exit 0'
+
+                    echo "Deployed to: ${env.DEPLOY_DIR}"
                 }
             }
         }
 
-		stage('Cleanup Old Deployments (keep latest 10)') {
-			steps {
-				bat '''
-		powershell -NoProfile -Command " 
-		$path = 'C:\\Users\\tongp\\my_playwright_tests_report'; 
-		$folders = Get-ChildItem -Path $path -Directory | Sort-Object LastWriteTime -Descending; 
-		if ($folders.Count -gt 10) { 
-			$folders | Select-Object -Skip 10 | Remove-Item -Recurse -Force 
-		}"
-		'''
-			}
-		}
-
-
-
-
-        stage('Compile Python App (PyInstaller)') {
+        stage('Cleanup Old Deployments (keep latest 10)') {
             steps {
-                script {
-                    bat "\"%PIP%\" install pyinstaller"
-
-                    // Compile everything under tests/
-                    bat "\"%PYTHON%\" -m PyInstaller --onefile tests/main.py --distpath dist"
-
-                    // Create deployment folder
-                    bat "mkdir \"${DEPLOY_BIN}\""
-
-                    // Copy build results
-                    bat "copy /Y dist\\main.exe \"${DEPLOY_BIN}\""
-                }
+                bat """
+                    powershell -Command ^
+                      "$path = '%DEPLOY_BASE%'; ^
+                       Get-ChildItem -Path $path -Directory ^
+                         | Where-Object { $_.Name -match '^Report_\\d{8}_\\d{6}$' } ^
+                         | Sort-Object CreationTime -Descending ^
+                         | Select-Object -Skip 10 ^
+                         | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue"
+                """
             }
         }
 
-    } // end stages
+        stage('Build Standalone Executable') {
+            steps {
+                bat '"%PIP%" install --upgrade pyinstaller'
+                bat """
+                    rmdir /S /Q build 2>nul || ver >nul
+                    del /Q *.spec 2>nul || ver >nul
+                    rmdir /S /Q "%DEPLOY_BIN%" 2>nul || ver >nul
+                    mkdir "%DEPLOY_BIN%"
+                """
+                bat """
+                    "%PYTHON%" -m PyInstaller ^
+                      --onefile ^
+                      --name playwright_runner ^
+                      --distpath "%DEPLOY_BIN%" ^
+                      --clean ^
+                      tests\\main.py
+                """
+                echo "Executable created at: %DEPLOY_BIN%\\playwright_runner.exe"
+            }
+        }
+    }
 
     post {
         always {
-            archiveArtifacts artifacts: '**/playwright-report.html', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'playwright-report.html', 
+                            allowEmptyArchive: true
+            archiveArtifacts artifacts: '${DEPLOY_BIN}/playwright_runner.exe', 
+                            allowEmptyArchive: true
+            // Optional: clean workspace to save disk space
+            cleanWs(cleanWhenNotBuilt: false,
+                    deleteDirs: true,
+                    notFailBuild: true)
+        }
+        success {
+            echo 'Playwright tests passed and report + executable deployed successfully!'
         }
         failure {
-            echo 'Build failed! Check the test report for details.'
+            echo 'Pipeline failed — check the Playwright HTML report above for details.'
         }
     }
 }
