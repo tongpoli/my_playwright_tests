@@ -5,7 +5,12 @@ pipeline {
         VENV = "${WORKSPACE}\\venv"
         PYTHON = "${VENV}\\Scripts\\python.exe"
         PIP = "${VENV}\\Scripts\\pip.exe"
-        DEPLOY_DIR = "C:\\Users\\tongp\\my_playwright_tests_report"
+
+        // Deployment base folder
+        DEPLOY_BASE = "C:\\Users\\tongp\\my_playwright_tests_report"
+
+        // Final deployment folder for compiled files
+        DEPLOY_BIN = "C:\\Users\\tongp\\my_playwright_tests_report\\deployment"
     }
 
     stages {
@@ -26,11 +31,11 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                bat '"%PYTHON%" -m pytest tests --html=playwright-report.html --self-contained-html'
+                bat '"%PYTHON%" -m pytest tests --html=playwright-report.html --self-contained-html --disable-warnings'
             }
         }
 
-        stage('Publish Report') {
+        stage('Publish Report to Jenkins') {
             steps {
                 publishHTML(target: [
                     allowMissing: false,
@@ -43,30 +48,62 @@ pipeline {
             }
         }
 
-        stage('Deploy Report (CD)') {
+        /* ---------------------------
+           🔽 CONTINUOUS DEPLOYMENT (CD)
+           --------------------------- */
+
+        stage('Deploy Report + Artifacts') {
             steps {
                 script {
-                    // Generate timestamp for versioning: 2025-12-01_10-45-20
-                    def timestamp = new Date().format("yyyy-MM-dd_HH-mm-ss")
+                    // Create timestamp for versioning
+                    def ts = new Date().format("yyyyMMdd_HHmmss")
+                    env.DEPLOY_DIR = "${DEPLOY_BASE}\\deploy_${ts}"
 
-                    // Full target path
-                    env.TARGET_PATH = "${DEPLOY_DIR}\\${timestamp}"
+                    echo "Creating deployment folder: ${env.DEPLOY_DIR}"
+                    bat "mkdir \"${env.DEPLOY_DIR}\""
 
-                    echo "Deploying report to ${env.TARGET_PATH}"
-
-                    // Create folder
-                    bat """
-                        powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '${env.TARGET_PATH}'"
-                    """
-
-                    // Copy report file
-                    bat """
-                        powershell -NoProfile -Command "Copy-Item '${WORKSPACE}\\playwright-report.html' '${env.TARGET_PATH}\\playwright-report.html' -Force"
-                    """
+                    // Copy HTML report, screenshots & logs if exist
+                    bat "copy /Y \"playwright-report.html\" \"${env.DEPLOY_DIR}\""
+                    bat "if exist \"screenshots\" xcopy screenshots \"${env.DEPLOY_DIR}\\screenshots\" /E /I /Y"
+                    bat "if exist \"logs\" xcopy logs \"${env.DEPLOY_DIR}\\logs\" /E /I /Y"
                 }
             }
         }
-    }
+
+        stage('Cleanup Old Deployments (keep latest 10)') {
+            steps {
+                script {
+                    def cleanupScript = """
+                        powershell -NoProfile -Command "
+                        \$folders = Get-ChildItem '${DEPLOY_BASE}' -Directory | Sort-Object LastWriteTime -Descending
+                        if (\$folders.Count -gt 10) {
+                            \$folders[10..(\$folders.Count-1)] | Remove-Item -Recurse -Force
+                        }
+                        "
+                    """
+                    bat cleanupScript
+                }
+            }
+        }
+
+        stage('Compile Python App (PyInstaller)') {
+            steps {
+                script {
+                    bat "\"%PIP%\" install pyinstaller"
+
+                    // Compile everything under tests/
+                    bat "\"%PYTHON%\" -m PyInstaller --onefile tests/main.py --distpath dist"
+
+                    // Create deployment folder
+                    bat "mkdir \"${DEPLOY_BIN}\""
+
+                    // Copy build results
+                    bat "copy /Y dist\\main.exe \"${DEPLOY_BIN}\""
+                }
+            }
+        }
+
+    } // end stages
 
     post {
         always {
