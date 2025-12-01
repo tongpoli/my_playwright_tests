@@ -95,6 +95,13 @@ stages {
             }
         }
     }
+	
+	stage('Cleanup Old Deployments (keep latest 10)') {
+		steps {
+			bat 'powershell -NoProfile -Command "$path=\'C:\\Users\\tongp\\my_playwright_tests_report\'; $folders=Get-ChildItem -Path $path -Directory | Where-Object { $_.Name -like \'Deployment_*\' } | Sort-Object LastWriteTime -Descending; if($folders.Count -gt 10) { $folders | Select-Object -Skip 10 | Remove-Item -Recurse -Force }"'
+		}
+	}
+
 
 } // end stages
 
