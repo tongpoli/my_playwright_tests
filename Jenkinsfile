@@ -70,21 +70,20 @@ pipeline {
             }
         }
 
-        stage('Cleanup Old Deployments (keep latest 10)') {
-            steps {
-                script {
-                    def cleanupScript = """
-                        powershell -NoProfile -Command "
-                        \$folders = Get-ChildItem '${DEPLOY_BASE}' -Directory | Sort-Object LastWriteTime -Descending
-                        if (\$folders.Count -gt 10) {
-                            \$folders[10..(\$folders.Count-1)] | Remove-Item -Recurse -Force
-                        }
-                        "
-                    """
-                    bat cleanupScript
-                }
-            }
-        }
+		stage('Cleanup Old Deployments (keep latest 10)') {
+			steps {
+				script {
+					bat """
+		powershell -NoProfile -Command ^
+			"\$folders = Get-ChildItem 'C:\\Users\\tongp\\my_playwright_tests_report' -Directory | Sort-Object LastWriteTime -Descending; ^
+			if (\$folders.Count -gt 10) { ^
+				\$folders[10..(\$folders.Count-1)] | ForEach-Object { Remove-Item -Recurse -Force \$_.FullName }; ^
+			}"
+		"""
+				}
+			}
+		}
+
 
         stage('Compile Python App (PyInstaller)') {
             steps {
