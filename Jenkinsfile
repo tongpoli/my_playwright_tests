@@ -1,7 +1,7 @@
 pipeline {
 agent any
 
-```
+
 environment {
     VENV = "${WORKSPACE}\\venv"
     PYTHON = "${VENV}\\Scripts\\python.exe"
@@ -106,6 +106,6 @@ post {
         echo 'Build failed! Check the test report for details.'
     }
 }
-```
+
 
 }
