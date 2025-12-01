@@ -72,21 +72,17 @@ pipeline {
 
 		stage('Cleanup Old Deployments (keep latest 10)') {
 			steps {
-				script {
-					bat """
-		powershell -NoProfile -Command "& {
-			\$path = 'C:\\Users\\tongp\\my_playwright_tests_report';
-			\$folders = Get-ChildItem -Path \$path -Directory | Sort-Object LastWriteTime -Descending;
-			if (\$folders.Count -gt 10) {
-				\$folders[10..(\$folders.Count-1)] | ForEach-Object {
-					Remove-Item -Recurse -Force \$_.FullName
-				}
-			}
+				bat '''
+		powershell -NoProfile -Command " 
+		$path = 'C:\\Users\\tongp\\my_playwright_tests_report'; 
+		$folders = Get-ChildItem -Path $path -Directory | Sort-Object LastWriteTime -Descending; 
+		if ($folders.Count -gt 10) { 
+			$folders | Select-Object -Skip 10 | Remove-Item -Recurse -Force 
 		}"
-					"""
-				}
+		'''
 			}
 		}
+
 
 
 
